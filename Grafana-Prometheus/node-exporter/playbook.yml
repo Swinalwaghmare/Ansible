@@ -64,5 +64,5 @@
     - name: Enable and Start Node Exporter
       systemd:
         name: node_exporter
-        enable: true
+        enabled: true
         state: started
