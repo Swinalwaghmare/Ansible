@@ -1,0 +1,68 @@
+---
+- name: Install and Configure Node Exporter
+  hosts: all
+  become: true
+
+  vars:
+    node_exporter_version: "1.8.2"
+    node_exporter_user: "node_exporter"
+    node_exporter_binary: "node_exporter"
+    node_exporter_download_url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    node_exporter_install_dir: "/usr/local/bin"
+
+  tasks:
+    - name: Create node_exporter system user
+      user: 
+        name: "{{ node_exporter_user }}"
+        shell: /usr/sbin/nologin
+        system: true
+        create_home: false
+    
+    - name: Download Node Exporter archive
+      get_url: 
+        url: "{{ node_exporter_download_url }}"
+        dest: "/tmp/node_exporter.tar.gz"
+        mode: "0644"
+    
+    - name: Extract Node Exporter
+      unarchive:
+        src: "/tmp/node_exporter.tar.gz"
+        dest: "/tmp"
+        remote_src: true
+    
+    - name: Copy Node Exporter binary to install directory
+      copy: 
+        src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/{{node_exporter_binary}}"
+        dest: "{{node_exporter_install_dir}}/{{node_exporter_binary}}"
+        owner: "{{ node_exporter_user }}"
+        group: "{{ node_exporter_user }}"
+        mode: '0755'
+        remote_src: true
+
+    - name: Create SystemD service file
+      copy:
+        dest: /etc/systemd/system/node_exporter.service
+        content: |
+          [Unit]
+          Description=Node Exporter 
+          Wants=network-online.target 
+          After=network-online.target
+          
+          [Service] 
+          User={{ node_exporter_user }} 
+          Group={{ node_exporter_user }} 
+          Type=simple 
+          ExecStart={{ node_exporter_install_dir }}/{{ node_exporter_binary }}
+          
+          [Install] 
+          WantedBy=multi-user.target
+    
+    - name: Reload Systemd
+      systemd:
+        daemon_reload: true
+    
+    - name: Enable and Start Node Exporter
+      systemd:
+        name: node_exporter
+        enable: true
+        state: started
